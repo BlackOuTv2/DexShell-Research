@@ -16,14 +16,16 @@ v26 bytecode interpreter → v29 native AOT compiler. All 11 anti-tamper layers 
 
 ---
 
-### 👤 Researcher
+### 👤 Researcher & Contact
 
 | | |
 |---|---|
-| **Author** | [@BlackOuTv2](https://github.com/BlackOuTv2) |
-| **GitHub** | https://github.com/BlackOuTv2 |
+| **GitHub** | [@BlackOuTv2](https://github.com/BlackOuTv2) |
+| **Telegram** | [@BlackOuTv1](https://t.me/BlackOuTv1) |
+| **LinkedIn** | [linkedin.com/in/black0ut](https://www.linkedin.com/in/black0ut/) |
+| **Instagram** | [@cyberxblackout](https://www.instagram.com/cyberxblackout/) |
 | **Research type** | Independent Android security research |
-| **Scope** | Static + dynamic analysis, Frida instrumentation, native disassembly |
+| **Scope** | Static + dynamic analysis, Frida instrumentation, native ARM64 disassembly |
 
 </div>
 
@@ -460,7 +462,11 @@ DexShell-Research/
 
 <div align="center">
 
-*Research for educational purposes.*  
-**[@BlackOuTv2](https://github.com/BlackOuTv2)** · Frida · radare2 · baksmali · Python
+*Research for educational purposes.*
+
+**[@BlackOuTv2](https://github.com/BlackOuTv2)** &nbsp;·&nbsp;
+**[Telegram @BlackOuTv1](https://t.me/BlackOuTv1)** &nbsp;·&nbsp;
+**[LinkedIn](https://www.linkedin.com/in/black0ut/)** &nbsp;·&nbsp;
+**[Instagram @cyberxblackout](https://www.instagram.com/cyberxblackout/)**
 
 </div>
