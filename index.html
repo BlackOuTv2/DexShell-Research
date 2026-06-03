@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DexShell Android Packer — Deep Reverse Engineering</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+  :root {
+    --bg:        #0a0c10;
+    --bg2:       #0d1117;
+    --card:      #161b22;
+    --border:    #30363d;
+    --accent:    #58a6ff;
+    --green:     #3fb950;
+    --yellow:    #d29922;
+    --red:       #f85149;
+    --purple:    #bc8cff;
+    --orange:    #ffa657;
+    --text:      #e6edf3;
+    --muted:     #8b949e;
+    --glow:      rgba(88,166,255,.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ── Hero ──────────────────────────────────────────────── */
+  .hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 40%, #0d1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 60px 40px 50px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(88,166,255,.08), transparent);
+    pointer-events: none;
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(88,166,255,.1);
+    border: 1px solid rgba(88,166,255,.3);
+    color: var(--accent);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #e6edf3 30%, #58a6ff 70%, #bc8cff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+  }
+  .hero p {
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 640px;
+    margin: 0 auto 28px;
+  }
+  .badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge.green  { border-color: rgba(63,185,80,.4);  color: var(--green);  }
+  .badge.blue   { border-color: rgba(88,166,255,.4); color: var(--accent); }
+  .badge.purple { border-color: rgba(188,140,255,.4);color: var(--purple); }
+  .badge.orange { border-color: rgba(255,166,87,.4); color: var(--orange); }
+  .badge.red    { border-color: rgba(248,81,73,.4);  color: var(--red);    }
+
+  /* ── Nav ───────────────────────────────────────────────── */
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 28px;
+    max-width: 800px;
+    margin: 40px auto;
+  }
+  .toc h3 { color: var(--accent); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+  .toc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 6px; }
+  .toc a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    display: block;
+    transition: background .15s, color .15s;
+  }
+  .toc a:hover { background: var(--glow); color: var(--accent); }
+  .toc a::before { content: '› '; color: var(--muted); }
+
+  /* ── Layout ────────────────────────────────────────────── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+
+  section { margin-bottom: 64px; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .section-header .tag {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+
+  /* ── Cards ─────────────────────────────────────────────── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 16px; margin-bottom: 20px; }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+  }
+  .stat-card .num { font-size: 36px; font-weight: 800; }
+  .stat-card .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Diagram wrapper ───────────────────────────────────── */
+  .diagram-wrap {
+    background: #161b22;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 20px;
+    overflow-x: auto;
+    margin-bottom: 20px;
+  }
+  .diagram-wrap .mermaid { display: flex; justify-content: center; }
+  .diagram-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  /* ── Code ──────────────────────────────────────────────── */
+  .code-wrap {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .code-header {
+    background: #1c2128;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .code-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .code-wrap pre { margin: 0; }
+  .code-wrap pre code { border-radius: 0 !important; font-size: 13px; }
+
+  /* ── Table ─────────────────────────────────────────────── */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tbl th {
+    background: #1c2128;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .tbl td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #21262d;
+    vertical-align: top;
+  }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tr:hover td { background: rgba(255,255,255,.02); }
+  .tbl-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  /* ── Alert boxes ───────────────────────────────────────── */
+  .alert {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    border-left: 3px solid;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .alert.warn  { background: rgba(210,153,34,.08);  border-color: var(--yellow); }
+  .alert.danger{ background: rgba(248,81,73,.08);   border-color: var(--red);   }
+  .alert.info  { background: rgba(88,166,255,.08);  border-color: var(--accent);}
+  .alert.good  { background: rgba(63,185,80,.08);   border-color: var(--green); }
+
+  /* ── Misc ──────────────────────────────────────────────── */
+  code.inline {
+    background: rgba(110,118,129,.2);
+    border: 1px solid rgba(110,118,129,.25);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 13px;
+    color: var(--accent);
+  }
+  p { margin-bottom: 12px; color: var(--text); font-size: 15px; }
+  h3 { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
+  h4 { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+  ul { padding-left: 20px; margin-bottom: 12px; }
+  ul li { color: var(--text); font-size: 14px; margin-bottom: 5px; }
+  ul li::marker { color: var(--accent); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:700px) { .two-col { grid-template-columns: 1fr; } }
+
+  .method-id { font-family: monospace; background: rgba(188,140,255,.15); color: var(--purple); border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+  .bypass-tag { font-size: 11px; background: rgba(63,185,80,.15); color: var(--green); border-radius: 4px; padding: 2px 7px; font-weight: 600; }
+  .new-tag    { font-size: 11px; background: rgba(255,166,87,.15); color: var(--orange); border-radius: 4px; padding: 2px 7px; font-weight: 600; }
+
+  .footer { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+  .footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<!-- ══ HERO ════════════════════════════════════════════════════════════════ -->
+<div class="hero">
+  <div class="hero-badge">🔬 Android Security Research</div>
+  <h1>DexShell Packer — Deep Reverse Engineering</h1>
+  <p>Complete analysis of the DexShell / DexProtectX commercial Android packer.
+     v26 bytecode VMP → v29 native AOT compiler. All 11 anti-tamper layers documented and bypassed.</p>
+  <div class="badges">
+    <span class="badge green">✓ Fully Bypassed</span>
+    <span class="badge blue">Frida · radare2 · baksmali</span>
+    <span class="badge purple">ARM64 · Android 13</span>
+    <span class="badge orange">1,448 VMP methods</span>
+    <span class="badge red">⚠ platform.pk8 found</span>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ── TOC ─────────────────────────────────────────────────────────────── -->
+<div class="toc">
+  <h3>📋 Contents</h3>
+  <div class="toc-grid">
+    <a href="#overview">Overview & Stats</a>
+    <a href="#apk">APK Structure</a>
+    <a href="#bootstrap">Bootstrap Flow</a>
+    <a href="#antitamper">Anti-Tamper Layers</a>
+    <a href="#vmp">VMP Architecture</a>
+    <a href="#ih">InstrumentationHijacker</a>
+    <a href="#dex">DEX Header Obfuscation</a>
+    <a href="#strings">String Encryption</a>
+    <a href="#runic">Runic Unicode Obfuscation</a>
+    <a href="#network">Network & Backend</a>
+    <a href="#keys">AOSP Keys Found</a>
+    <a href="#bypass">Bypass Pipeline</a>
+    <a href="#tools">Tools Built</a>
+    <a href="#diff">v26 → v29 Diff</a>
+  </div>
+</div>
+
+<!-- ══ OVERVIEW ════════════════════════════════════════════════════════════ -->
+<section id="overview">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(88,166,255,.1)">📊</div>
+    <h2>Overview & Key Numbers</h2>
+    <span class="tag">DexShell v26 + v29</span>
+  </div>
+
+  <div class="card-grid">
+    <div class="stat-card"><div class="num" style="color:var(--accent)">11</div><div class="lbl">Anti-Tamper Mechanisms</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--green)">1,448</div><div class="lbl">VMP-Protected Methods</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--purple)">514</div><div class="lbl">Classes Hidden in v29</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--orange)">725</div><div class="lbl">String Literals Annotated</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--red)">4</div><div class="lbl">AOSP Signing Keys Found</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--yellow)">8×</div><div class="lbl">Config Size Growth v26→v29</div></div>
+  </div>
+
+  <div class="alert info">
+    <span class="alert-icon">ℹ️</span>
+    <div><strong>Target:</strong> <code class="inline">com.x.dexprotectx</code> — DexProtectX panel app, wrapping a Blinkit delivery APK.
+    Analyzed on Pixel 6a (Android 13, ARM64) using Frida Gadget (Zygisk) + radare2 + custom Python tooling.</div>
+  </div>
+</section>
+
+<!-- ══ APK STRUCTURE ═══════════════════════════════════════════════════════ -->
+<section id="apk">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(255,166,87,.1)">📦</div>
+    <h2>APK Structure</h2>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="diagram-title">APK Asset Map</div>
+    <div class="mermaid">
+graph TD
+    APK["DexShellx_V29.0.apk<br/>33.74 MB"]:::root
+
+    APK --> A1["assets/DexShell.mp3<br/>9.2 MB — XOR-encrypted<br/>VMP container"]:::asset
+    APK --> A2["assets/dexshellx.pro<br/>21 KB — DXHD5 config"]:::asset
+    APK --> A3["assets/libVMDexShellx.so<br/>465 KB — PairIP anti-tamper SDK"]:::danger
+    APK --> A4["assets/dexshell/arm64-v8a/<br/>libdexshell.so 1.4 MB"]:::asset
+    APK --> A5["unknown/keys/<br/>platform.pk8 + media.pk8<br/>shared.pk8 + testkey"]:::critical
+    APK --> D1["classes.dex<br/>DexShell runtime (15 cls)"]:::dex
+    APK --> D2["classes5–16.dex<br/>Protected app DEX<br/>method bodies → N.invoke stubs"]:::dex
+
+    A1 --> E1["3 embedded ELFs<br/>arm64 / arm32 / x86<br/>DT_SONAME=libdexshellx.so"]:::elf
+    A3 --> E2["DT_SONAME=libpairipcore.so<br/>dl_iterate_phdr · opendir/readdir<br/>stat · syscall(tgkill)"]:::detail
+
+    classDef root  fill:#1c2128,stroke:#58a6ff,color:#e6edf3,font-weight:bold
+    classDef asset fill:#161b22,stroke:#30363d,color:#8b949e
+    classDef dex   fill:#161b22,stroke:#bc8cff,color:#bc8cff
+    classDef elf   fill:#0d1117,stroke:#3fb950,color:#3fb950
+    classDef danger fill:#1c0a09,stroke:#f85149,color:#f85149
+    classDef critical fill:#1c0f00,stroke:#d29922,color:#d29922,font-weight:bold
+    classDef detail fill:#0d1117,stroke:#30363d,color:#8b949e,font-size:11px
+    </div>
+  </div>
+
+  <div class="alert warn">
+    <span class="alert-icon">⚠️</span>
+    <div><strong>514 classes hidden in v29:</strong> In v26, 529 DexShell support classes were visible in static smali.
+    In v29, 514 were moved into an encrypted runtime DEX — including <code class="inline">okhttp3.*</code>,
+    <code class="inline">org.bouncycastle.*</code>, <code class="inline">kotlin.*</code>, <code class="inline">okio.*</code>.</div>
+  </div>
+</section>
+
+<!-- ══ BOOTSTRAP ═══════════════════════════════════════════════════════════ -->
+<section id="bootstrap">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(63,185,80,.1)">🚀</div>
+    <h2>Bootstrap Sequence</h2>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="diagram-title">Full App Startup — from Zygote fork to protected app running</div>
+    <div class="mermaid">
+flowchart TD
+    Z["Zygote fork\n(new process)"]:::start
+    Z --> AC["DexShellxApplication\n.attachBaseContext()"]
+
+    AC --> D1["Load libVMDexShellx.so\nPairIP anti-tamper SDK"]:::native
+    D1 --> D1a["JNI_OnLoad fires\nInstall all detection hooks\ndl_iterate_phdr · /proc scan\nstat · opendir · tgkill"]:::detect
+
+    D1a --> D2["Load libdexshell.so\n(decrypted from assets at runtime)"]:::native
+    D2 --> D3["Decrypt DexShell.mp3\nXOR key: 27d39683cc50fcba"]
+    D3 --> D4["Extract libdexshellx.so to\n/data/data/pkg/files/.../txt/%s\n(encrypted on disk)"]:::warn
+    D4 --> D5["dlopen encrypted path\n→ decrypt in memory\n→ valid ELF in RAM only"]:::native
+
+    D5 --> D6["ART ClassLinker::DefineClass\nLoad runtime encrypted DEX\n514 hidden classes"]
+    D6 --> OC["Application.onCreate()"]
+
+    OC --> IH["InstrumentationHijacker\n.ᛱ᛽᛽ᲅ() — install"]:::danger
+    IH --> IH1["reflect ActivityThread\n.getDeclaredField(mInstrumentation)"]
+    IH1 --> IH2["Swap with ProxyInstrumentation\nMonitors ALL activity calls\n28× execStartActivity check per 4s"]:::danger
+
+    IH2 --> DR["DREXz delayed_detection starts\n~4s timer → scan for Frida/root"]:::warn
+    DR --> APP["Protected app (Blinkit)\nloaded via K.ᛳᲆᛲ(Context,String)"]:::done
+
+    classDef start  fill:#0d1117,stroke:#58a6ff,color:#58a6ff,font-weight:bold
+    classDef native fill:#0d1117,stroke:#3fb950,color:#3fb950
+    classDef detect fill:#1c0a09,stroke:#f85149,color:#f85149
+    classDef danger fill:#1c0a09,stroke:#f85149,color:#f85149,font-weight:bold
+    classDef warn   fill:#1c1000,stroke:#d29922,color:#d29922
+    classDef done   fill:#091c13,stroke:#3fb950,color:#3fb950,font-weight:bold
+    </div>
+  </div>
+</section>
+
+<!-- ══ ANTI-TAMPER ══════════════════════════════════════════════════════════ -->
+<section id="antitamper">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(248,81,73,.1)">🛡️</div>
+    <h2>Anti-Tamper Mechanisms</h2>
+    <span class="tag">11 layers — all bypassed</span>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="diagram-title">Detection Layer Map</div>
+    <div class="mermaid">
+mindmap
+  root((DexShell<br/>Detection))
+    Filesystem
+      /proc/self/maps<br/>Frida regions
+      /proc/self/status<br/>TracerPid
+      /proc/net/tcp<br/>Port 14725
+      stat path<br/>frida files
+    Native
+      dl_iterate_phdr<br/>ELF enumeration
+      opendir/readdir<br/>dir scan
+      __system_property_get<br/>ro.debuggable
+      syscall tgkill 131<br/>bypass kill hook
+    Java
+      InstrumentationHijacker<br/>ProxyInstrumentation
+      execStartActivity poll<br/>28× per 4s
+    VMP
+      GOT corruption trap<br/>SIGSEGV at 0x77d61f0220
+      Golden ratio counter<br/>0x9e3779b9 per method
+      Dispatch return addr<br/>thunk integrity check
+    Timing
+      delayed_detection<br/>~4s deferred scan
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Mechanism</th><th>Library</th><th>How it detects</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><code class="inline">/proc/self/maps</code></td><td>libdexshell.so</td><td>Frida agent region names in memory map</td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+        <tr><td>2</td><td><code class="inline">TracerPid</code> check</td><td>libdexshell.so</td><td>Non-zero value in <code class="inline">/proc/self/status</code></td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+        <tr><td>3</td><td>GOT corruption trap</td><td>libdexshell.so</td><td>Overwrites libart GOT → SIGSEGV at <code class="inline">0x77d61f0220</code></td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+        <tr><td>4</td><td><code class="inline">dl_iterate_phdr</code></td><td>libVMDexShellx.so</td><td>ByteHook enumerates ELFs for frida-agent</td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+        <tr><td>5</td><td><code class="inline">opendir/readdir</code></td><td>libVMDexShellx.so</td><td>Directory scan for Frida files on disk</td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+        <tr><td>6</td><td><code class="inline">stat()</code> file check</td><td>libVMDexShellx.so</td><td>Checks for Frida filenames on filesystem</td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+        <tr><td>7</td><td><code class="inline">__system_property_get</code></td><td>libVMDexShellx.so</td><td>Checks <code class="inline">ro.debuggable</code>, <code class="inline">ro.build.tags</code></td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+        <tr><td>8</td><td><code class="inline">syscall(SYS_tgkill)</code></td><td>libdexshell.so</td><td>Raw syscall 131 bypasses <code class="inline">kill()</code> hook</td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+        <tr><td>9</td><td>VMP dispatch integrity</td><td>libdexshellx.so</td><td>Golden ratio counter + LR check per method</td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+        <tr><td>10</td><td>InstrumentationHijacker</td><td>Runtime DEX</td><td>ProxyInstrumentation monitors all hooks</td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+        <tr><td>11</td><td><code class="inline">delayed_detection</code></td><td>DREXz</td><td>~4s deferred full scan</td><td><span class="bypass-tag">✓ BYPASSED</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>GOT Trap — Bypass Code</h3>
+  <div class="code-wrap">
+    <div class="code-header"><div class="code-dot" style="background:#ff5f57"></div><div class="code-dot" style="background:#febc2e"></div><div class="code-dot" style="background:#28c840"></div><span>frida · JavaScript</span></div>
+    <pre><code class="language-javascript">// When Frida detected: DexShell overwrites libart.so GOT entry
+// with 0x77d61f0220 → SIGSEGV on next JNI call
+// Bypass: catch the fault and resume at return address
+
+Process.setExceptionHandler(details => {
+    if (details.address.equals(ptr('0x77d61f0220'))) {
+        details.context.pc = details.context.lr;  // skip to caller
+        details.context.x0 = ptr(1);               // fake success return
+        return true;  // handled — don't crash
+    }
+});</code></pre>
+  </div>
+</section>
+
+<!-- ══ VMP ══════════════════════════════════════════════════════════════════ -->
+<section id="vmp">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(188,140,255,.1)">⚙️</div>
+    <h2>VMP Architecture</h2>
+    <span class="tag">v26 interpreter → v29 AOT</span>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="diagram-title">VMP Execution Model Comparison</div>
+    <div class="mermaid">
+flowchart LR
+    subgraph v26["v26 — Threaded Bytecode Interpreter"]
+        direction TB
+        J26["Java stub:\ninvoke-static {v0,v1},\nN.invoke(I,[Object)Object"]
+        J26 --> N26["libdexshellx.so\nJava_com_dexshell_x_N_invoke()"]
+        N26 --> C26["Fetch bytecode from DexShell.mp3\n@ offset[methodIdx]"]
+        C26 --> I26["256-opcode threaded interpreter\nloop over bytecode"]
+        I26 --> R26["Return result via JNI"]
+    end
+
+    subgraph v29["v29 — Native AOT Compiler"]
+        direction TB
+        J29["Java stub:\ninvoke-static {v0,v1},\nN.ᛱᛱ᛽(I,[Object)Object"]
+        J29 --> N29["libdexshellx.so dispatcher\nfuncVaddr[methodIdx]"]
+        N29 --> T29["Integrity check:\ngolden-ratio counter 0x9e3779b9\n+ LR dispatch thunk check"]
+        T29 --> A29["Execute compiled ARM64 function\n(pre-compiled, NOT interpreted)"]
+        A29 --> R29["Return result via JNI"]
+    end
+
+    classDef v26style fill:#0d1117,stroke:#58a6ff,color:#e6edf3
+    classDef v29style fill:#091c13,stroke:#3fb950,color:#e6edf3
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <h3>v26 — DexShell.mp3 Container Format</h3>
+      <div class="code-wrap">
+        <div class="code-header"><span>Binary format @ 0xD1051</span></div>
+        <pre><code class="language-c">// Per-class entry (repeating):
+uint16  name_len;
+char[]  class_descriptor;  // "La/o/MainActivety;"
+uint16  method_count;      // NOTE: uint16, NOT uint32
+repeat method_count:
+  uint32  global_method_idx;
+  uint32  vm_bytecode_offset;
+
+// Total: 1,395 classes, ~14,375 methods
+// 3 embedded ELFs: arm64(2.15MB) arm32(1.6MB) x86(2MB)</code></pre>
+      </div>
+    </div>
+    <div class="card">
+      <h3>v29 — Dispatch Table (ELF RELA)</h3>
+      <div class="code-wrap">
+        <div class="code-header"><span>Python — extract table</span></div>
+        <pre><code class="language-python"># Apply R_AARCH64_RELATIVE relocs to .data.rel.ro
+for r_off, r_type, _, r_addend in elf.rela_entries('.rela.dyn'):
+    if r_type != 1027: continue   # R_AARCH64_RELATIVE
+    loc = r_off - sec_vaddr
+    struct.pack_into('&lt;Q', sec_data, loc, r_addend)
+
+# Find longest run of code pointers
+# → VMP dispatch table: funcVaddr[methodId]
+# 1,448 entries after VMP signature filter</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h3>Sample ARM64 Disassembly — <code class="inline">isInstalled()</code></h3>
+  <div class="code-wrap">
+    <div class="code-header"><div class="code-dot" style="background:#ff5f57"></div><div class="code-dot" style="background:#febc2e"></div><div class="code-dot" style="background:#28c840"></div><span>ARM64 · methodId 0x3f · vaddr 0xff0b8</span></div>
+    <pre><code class="language-armasm">// original: Lcom/dexshell/x/InstrumentationHijacker;->isInstalled()Z
+// methodId: 0x3f  vaddr: 0xff0b8  size: 732
+
+0x000ff0b8  ff8303d1    sub sp, sp, 0xe0
+0x000ff0bc  fd7b08a9    stp x29, x30, [sp, 0x80]
+;; ── Golden-ratio integrity check ──────────────────────────
+0x000ff0e0  e8031faa    mov x8, xzr
+0x000ff0e4  08fd9152    movk w8, #0x9e37, lsl#16    ; 0x9e370000
+0x000ff0e8  e8b97272    movk w8, #0x61c8, lsl#0     ; → 0x9e3779b9
+;; ── JNI calls (annotated) ─────────────────────────────────
+0x000ff0ec  08783cf9    ldr x8, [x8, #0x6f0]   ; JNIEnv->GetPrimitiveArrayCritical
+0x000ff0f0  adrp x0, 0x4f000
+0x000ff0f4  00181591    add x0, x0, 0x546      ; "isInstalled"
+0x000ff0f8  08000090    adrp x8, 0x60000
+0x000ff0fc  089842f9    ldr x8, [x8, #0x530]   ; JNIEnv->NewStringUTF</code></pre>
+  </div>
+</section>
+
+<!-- ══ INSTRUMENTATION HIJACKER ════════════════════════════════════════════ -->
+<section id="ih">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(248,81,73,.1)">🪝</div>
+    <h2>InstrumentationHijacker <span class="new-tag">NEW v29</span></h2>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="diagram-title">Install Chain — reflective mInstrumentation swap</div>
+    <div class="mermaid">
+sequenceDiagram
+    participant App as Application.onCreate()
+    participant IH as InstrumentationHijacker
+    participant AT as ActivityThread
+    participant OS as Android OS
+
+    App->>IH: ᛱ᛽᛽ᲅ()V  [methodId 0x58]
+    IH->>IH: AtomicBoolean.compareAndSet(false,true)<br/>install-once guard
+    IH->>AT: ᛱᲆ᲋ᛳ()  get ActivityThread [0x5c]
+    AT-->>IH: currentThread object
+
+    IH->>AT: getDeclaredField("mInstrumentation")
+    IH->>AT: field.setAccessible(true)
+    IH->>AT: field.get(activityThread)
+    AT-->>IH: originalInstrumentation
+
+    IH->>IH: build ProxyInstrumentation(original)
+    IH->>AT: ᛱ᛼᲋ᲊ(thread, original) [0x56] inject
+    AT->>OS: mInstrumentation = ProxyInstrumentation
+
+    Note over OS: Now ProxyInstrumentation intercepts<br/>ALL execStartActivity calls<br/>Polls for hook 28× per 4s
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>methodId</th><th>Method name</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method-id">0x3f</span></td><td><code class="inline">isInstalled()Z</code></td><td>Check if ProxyInstrumentation is active</td></tr>
+        <tr><td><span class="method-id">0x41</span></td><td><code class="inline">uninstall()V</code></td><td>Restore original Instrumentation</td></tr>
+        <tr><td><span class="method-id">0x42–44</span></td><td><code class="inline">ᛱᛱᛱ/ᛱᛱᛲ/ᛱᛱᛳ ()Z</code></td><td>Detection flag booleans (root / debug / hook)</td></tr>
+        <tr><td><span class="method-id">0x56</span></td><td><code class="inline">ᛱ᛼᲋ᲊ(Object,Instrumentation)V</code></td><td><strong>Inject</strong> — swaps <code class="inline">mInstrumentation</code></td></tr>
+        <tr><td><span class="method-id">0x58</span></td><td><code class="inline">ᛱ᛽᛽ᲅ()V</code></td><td><strong>Install</strong> — called from <code class="inline">Application.onCreate</code></td></tr>
+        <tr><td><span class="method-id">0x5c</span></td><td><code class="inline">ᛱᲆ᲋ᛳ()Object</code></td><td>Get current <code class="inline">ActivityThread</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-header"><div class="code-dot" style="background:#ff5f57"></div><div class="code-dot" style="background:#febc2e"></div><div class="code-dot" style="background:#28c840"></div><span>Frida bypass — all 3 entry points</span></div>
+    <pre><code class="language-javascript">const IH = Java.use('com.dexshell.x.InstrumentationHijacker');
+
+// 1. Block install — prevents entire chain
+IH['ᛱ᛽᛽ᲅ'].implementation = function() {};
+
+// 2. Block inject — defense in depth
+IH['ᛱ᛼᲋ᲊ'].implementation = function(thread, inst) {};
+
+// 3. Force isInstalled → false
+IH['isInstalled'].implementation = function() { return false; };
+
+// 4. All detection booleans → false
+['ᛱᛱᛱ','ᛱᛱᛲ','ᛱᛱᛳ','ᛱᛱᛶ','ᛱᛱᛸ'].forEach(m => {
+    IH[m].implementation = () => false;
+});</code></pre>
+  </div>
+</section>
+
+<!-- ══ DEX HEADER ═══════════════════════════════════════════════════════════ -->
+<section id="dex">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(210,153,34,.1)">🔒</div>
+    <h2>DEX Header Obfuscation <span class="new-tag">NEW v29</span></h2>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="diagram-title">DexHeaderRestore — what gets zeroed vs what stays intact</div>
+    <div class="mermaid">
+block-beta
+  columns 4
+  block:header["DEX Header (0x70 bytes)"]:4
+    magic["magic[0:8]\ndex\\n035\\0\n→ 'DexShell'"]:::obf
+    checksum["checksum\n[0x08]\n✓ INTACT"]:::ok
+    sha1["SHA-1\n[0x0c]\n✓ INTACT"]:::ok
+    filesize["file_size\n[0x20]\n→ BOGUS"]:::obf
+    headersize["header_size\n[0x24]\n✓ INTACT"]:::ok
+    endian["endian_tag\n[0x28]\n✓ INTACT"]:::ok
+    link["link_size/off\n[0x30]\n→ 0xffff0Xc0"]:::obf
+    mapoff["map_off\n[0x34]\n→ 0"]:::obf
+    strids["string_ids\n[0x3c]\n→ 0xffff0Xc0"]:::obf
+    typeids["type_ids\n[0x44]\n→ 0xffff0Xc0"]:::obf
+    protoids["proto_ids\n[0x4c]\n→ 0xffff0Xc0"]:::obf
+    fieldids["field_ids\n[0x54]\n→ 0xffff0Xc0"]:::obf
+    methodids["method_ids\n[0x5c]\n→ 0xffff0Xc0"]:::obf
+    classdef["class_defs\n[0x64]\n→ 0xffff0Xc0"]:::obf
+    datasize["data_size\n[0x6c]\n✓ INTACT"]:::ok
+    dataoff["data_off\n[0x70]\n→ 0xffff0Xc0"]:::obf
+  end
+  classDef obf fill:#1c0a09,stroke:#f85149,color:#f85149
+  classDef ok  fill:#091c13,stroke:#3fb950,color:#3fb950
+    </div>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-header"><span>Python — full header reconstruction</span></div>
+    <pre><code class="language-python">import struct, hashlib, zlib
+
+SIZE_OFF_PAIRS = [
+    (0x38, 0x3c),   # string_ids_size → string_ids_off
+    (0x40, 0x44),   # type_ids_size   → type_ids_off
+    (0x48, 0x4c),   # proto_ids_size  → proto_ids_off
+    (0x50, 0x54),   # field_ids_size  → field_ids_off
+    (0x58, 0x5c),   # method_ids_size → method_ids_off
+    (0x60, 0x64),   # class_defs_size → class_defs_off
+    (0x68, 0x6c),   # data_size       → data_off
+]
+ENTRY_SIZES = {0x3c:4, 0x44:4, 0x4c:12, 0x54:8, 0x5c:8, 0x64:32, 0x6c:1}
+
+def deobfuscate_dex(data):
+    d = bytearray(data)
+    d[0:8] = b'dex\n035\x00'        # restore magic
+    off = 0x70                       # start after fixed header
+    for sz_off, id_off in SIZE_OFF_PAIRS:
+        count = struct.unpack_from('&lt;I', d, sz_off)[0]
+        if count > 0:
+            struct.pack_into('&lt;I', d, id_off, off)
+            off += count * ENTRY_SIZES[id_off]
+            off = (off + 3) & ~3     # 4-byte align
+    struct.pack_into('&lt;I', d, 32, len(d))  # fix file_size
+    # recompute adler32 + sha1 ...
+    return bytes(d)</code></pre>
+  </div>
+</section>
+
+<!-- ══ STRING ENCRYPTION ═══════════════════════════════════════════════════ -->
+<section id="strings">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(88,166,255,.1)">🔐</div>
+    <h2>String Encryption</h2>
+  </div>
+
+  <div class="card">
+    <h3>Algorithm — XOR with cycling key</h3>
+    <div class="code-wrap" style="margin-top:12px">
+      <div class="code-header"><span>Python decryptor</span></div>
+      <pre><code class="language-python">def xor_decrypt(ciphertext: bytes, key: bytes) -> str:
+    return bytes(c ^ key[i % len(key)] for i, c in enumerate(ciphertext)).decode()
+
+# Class:  com.dexshell.x.shell.ᛱᛱᛳ
+# Method: ᛱᛶᲃᲁ([B ciphertext, [B key) → String</code></pre>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>Location</th><th>Key (hex)</th><th>Plaintext</th></tr></thead>
+      <tbody>
+        <tr><td><code class="inline">StartActivityService.&lt;clinit&gt;</code></td><td><code class="inline">32 65 93 62 e7 3b c5 e2</code></td><td>StartActivityService</td></tr>
+        <tr><td><code class="inline">TargetActivity.&lt;clinit&gt;</code></td><td><code class="inline">67 36 5c 26 65 e4 4a 2e</code></td><td>TargetActivity</td></tr>
+        <tr><td><code class="inline">TargetActivity.onCreate extra</code></td><td><code class="inline">cb cc 90 8c c6 50 04 c0</code></td><td><strong>dexshell_hook</strong></td></tr>
+        <tr><td>Runtime captured</td><td><code class="inline">6df83e88e674e688</code></td><td>execStartActivity</td></tr>
+        <tr><td>Runtime captured</td><td><code class="inline">fb6c2ac32deba7f8</code></td><td>dex_login_panel_bypass</td></tr>
+        <tr><td>Runtime captured</td><td><code class="inline">79c7185ad295af69</code></td><td>ACCESS_EXPIRED</td></tr>
+        <tr><td>Runtime captured</td><td><code class="inline">eac89a5c67793e66</code></td><td>DEVELOPER_MODE</td></tr>
+        <tr><td>Runtime captured</td><td><code class="inline">fc78d4510348f4ca</code></td><td>USB_DEBUG</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ RUNIC ══════════════════════════════════════════════════════════════════ -->
+<section id="runic">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(188,140,255,.1)">ᚱ</div>
+    <h2>Runic Unicode Obfuscation <span class="new-tag">NEW v29</span></h2>
+  </div>
+
+  <div class="alert info">
+    <span class="alert-icon">ℹ️</span>
+    <div>All JNI method names in <code class="inline">com.dexshell.x.shell.K</code> were renamed from ASCII
+    (<code class="inline">K.s</code>, <code class="inline">K.b</code>, <code class="inline">K.j</code>) to Runic script characters (U+16A0–U+16FF).
+    This defeats all <code class="inline">\w+</code> regex patterns and ASCII-assumption decompiler heuristics.</div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>v26 ASCII name</th><th>v29 Runic name</th><th>Signature</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code class="inline">K.s(String)Z</code></td><td><code class="inline">K.ᛴᲆᛶ()Z</code></td><td><code class="inline">()Z</code></td><td>Security check #1 → hook: return true</td></tr>
+        <tr><td><code class="inline">K.b(String)Z</code></td><td><code class="inline">K.ᛴᲆᛷ(String)Z</code></td><td><code class="inline">(String)Z</code></td><td>Security check #2 → hook: return true</td></tr>
+        <tr><td><code class="inline">K.j(String)Object</code></td><td><code class="inline">K.ᛴᲆᛵ(String)Object</code></td><td><code class="inline">(String)Object</code></td><td>getApplication</td></tr>
+        <tr><td><code class="inline">K.p(String)String</code></td><td><code class="inline">K.ᛴᲆᛳ(String)String</code></td><td><code class="inline">(String)String</code></td><td>Decrypt/transform string</td></tr>
+        <tr><td>—</td><td><code class="inline">K.ᛳᲆᛲ(Context,String)V</code></td><td><code class="inline">(Context,String)V</code></td><td>Load wrapped app</td></tr>
+        <tr><td>—</td><td><code class="inline">N.ᛱᛱ᛽(I,[Object)Object</code></td><td><code class="inline">(I,[Object)Object</code></td><td>VMP dispatcher (was <code class="inline">N.invoke</code>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ NETWORK ═════════════════════════════════════════════════════════════ -->
+<section id="network">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(63,185,80,.1)">🌐</div>
+    <h2>Network & Backend</h2>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <h3>API Endpoints</h3>
+      <div class="code-wrap" style="margin-top:12px">
+        <div class="code-header"><span>dexprotectx.pro</span></div>
+        <pre><code class="language-http">POST /dex/mobile/login         ← auth
+GET  /dex/analytics/check      ← license (every launch)
+GET  /dex/update?version=29.0  ← triggers auto-update
+GET  /dex/apk/DexShellx_V29.0.apk
+POST /dex/mobile/pinning       ← cert pinning config
+POST /dex/register             ← PLAINTEXT registration</code></pre>
+      </div>
+    </div>
+    <div>
+      <h3>Block Rules (iptables)</h3>
+      <div class="code-wrap" style="margin-top:12px">
+        <div class="code-header"><span>Magisk service.d script</span></div>
+        <pre><code class="language-bash"># IPv4
+iptables -I OUTPUT -d 172.67.151.252 -j DROP
+iptables -I OUTPUT -d 104.21.33.246  -j DROP
+
+# IPv6 (gap that let v29 reach server!)
+ip6tables -I OUTPUT \
+  -d 2606:4700:3032::6815:21f6 -j DROP
+ip6tables -I OUTPUT \
+  -d 2606:4700:3031::ac43:97fc -j DROP</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert danger">
+    <span class="alert-icon">🔑</span>
+    <div><strong>Credentials found in plaintext SharedPreferences:</strong>
+    <code class="inline">USER=blackout@007</code> / <code class="inline">PASS=qwerty321</code>
+    — stored with no encryption, accessible to any root user or backup tool.</div>
+  </div>
+</section>
+
+<!-- ══ AOSP KEYS ═══════════════════════════════════════════════════════════ -->
+<section id="keys">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(210,153,34,.1)">🗝️</div>
+    <h2>AOSP Platform Keys Found in APK</h2>
+  </div>
+
+  <div class="alert danger">
+    <span class="alert-icon">⚠️</span>
+    <div><strong>Critical finding:</strong> <code class="inline">decoded/unknown/keys/</code> contains
+    <code class="inline">platform.pk8</code> (AOSP platform signing key). APKs signed with the platform key can request
+    <code class="inline">sharedUserId="android.uid.system"</code>, granting system-level permissions and bypassing most
+    Android security checks.</div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>File</th><th>Type</th><th>Risk</th></tr></thead>
+      <tbody>
+        <tr><td><code class="inline">platform.pk8</code></td><td>PKCS#8 RSA private key</td><td style="color:var(--red)">🔴 System-level signature capability</td></tr>
+        <tr><td><code class="inline">media.pk8</code></td><td>AOSP media signing key</td><td style="color:var(--yellow)">🟡 Media process access</td></tr>
+        <tr><td><code class="inline">shared.pk8</code></td><td>AOSP shared signing key</td><td style="color:var(--yellow)">🟡 Shared UID access</td></tr>
+        <tr><td><code class="inline">testkey.pk8</code></td><td>AOSP testkey</td><td style="color:var(--muted)">⚪ Low risk on production</td></tr>
+        <tr><td><code class="inline">keystore.ks</code></td><td>JKS keystore</td><td style="color:var(--yellow)">🟡 All keys bundled</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ BYPASS PIPELINE ═════════════════════════════════════════════════════ -->
+<section id="bypass">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(63,185,80,.1)">🔓</div>
+    <h2>Bypass Pipeline</h2>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="diagram-title">bypass_v29_minimal.js — execution order</div>
+    <div class="mermaid">
+flowchart TD
+    S["frida -H 127.0.0.1:14725 -n Gadget\n-l bypass_v29_minimal.js"]:::start
+
+    S --> B1["1. Process.setExceptionHandler\nCatch GOT corruption SIGSEGV"]:::step
+    B1 --> B2["2. hookProcHide()\nFilter Frida from /proc/self/maps\nZero TracerPid\nBlock port 14725 in /proc/net/tcp"]:::step
+    B2 --> B3["3. hookDlIteratePhdr()\nHide Frida ELF from ByteHook scan"]:::step
+    B3 --> B4["4. hookNativeDetections()\nstat() → ENOENT for frida paths\nopendir/readdir → filter entries\n__system_property_get → spoof values\nsyscall(tgkill) → block self-kill"]:::step
+    B4 --> B5["5. Java.perform()\nK.ᛴᲆᛶ()Z → return true\nK.ᛴᲆᛷ(String)Z → return true"]:::step
+    B5 --> B6["6. Hook InstrumentationHijacker\nᛱ᛽᛽ᲅ → no-op\nᛱ᛼᲋ᲊ → no-op\nisInstalled → false\nall detection booleans → false"]:::step
+    B6 --> B7["7. blockKillSignals()\nSystem.exit → no-op\nProcess.killProcess → no-op\nexit/_exit/abort → no-op"]:::step
+    B7 --> OK["✓ App fully bypassed\nAll analysis tools active\nDelayed detection neutralized"]:::done
+
+    classDef start fill:#0d1117,stroke:#58a6ff,color:#58a6ff,font-weight:bold
+    classDef step  fill:#161b22,stroke:#30363d,color:#e6edf3
+    classDef done  fill:#091c13,stroke:#3fb950,color:#3fb950,font-weight:bold
+    </div>
+  </div>
+
+  <div class="alert good">
+    <span class="alert-icon">✅</span>
+    <div><strong>Connection method for v29:</strong> Uses Zygisk Frida Gadget on port 14725.
+    <code class="inline">-f</code> (spawn) and <code class="inline">-F</code> (frontmost) both fail — only
+    <code class="inline">-n Gadget</code> works after <code class="inline">adb forward tcp:14725 tcp:14725</code>.
+    Attach ~1.3–1.5s after starting app manually.</div>
+  </div>
+</section>
+
+<!-- ══ TOOLS ═══════════════════════════════════════════════════════════════ -->
+<section id="tools">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(88,166,255,.1)">🛠️</div>
+    <h2>Tools Built</h2>
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <h3>🐍 dexshell_unpack_all.py</h3>
+      <p style="font-size:13px;color:var(--muted)">Standalone VMP unpacker. ADB pull → ELF analysis → radare2 disasm → annotated ASM + r2 project. No extra Python deps.</p>
+      <code class="inline">--pkg --so --dex --out --batch</code>
+    </div>
+    <div class="card">
+      <h3>🔧 gen_asm_from_r2.py</h3>
+      <p style="font-size:13px;color:var(--muted)">Regenerate all <code class="inline">asm/</code> files from <code class="inline">libdexshellx.r2</code> + SO. No device needed. Parses <code class="inline">CCu base64:</code> for metadata.</p>
+      <code class="inline">--so --r2 --out --batch</code>
+    </div>
+    <div class="card">
+      <h3>🔨 deobfuscate_dexheader.py</h3>
+      <p style="font-size:13px;color:var(--muted)">Fully reconstruct all obfuscated DEX offset fields from intact size fields. Synthesizes map section, recomputes adler32 + SHA-1.</p>
+      <code class="inline">input.dex output.dex</code>
+    </div>
+    <div class="card">
+      <h3>📊 decode_config_v29.py</h3>
+      <p style="font-size:13px;color:var(--muted)">Static analysis of the DXHD5 config format. Accepts a captured runtime key to decrypt the payload structure.</p>
+      <code class="inline">--config dexshellx.pro --key &lt;hex&gt;</code>
+    </div>
+  </div>
+</section>
+
+<!-- ══ DIFF TABLE ═══════════════════════════════════════════════════════════ -->
+<section id="diff">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(255,166,87,.1)">📋</div>
+    <h2>v26 → v29 Diff Table</h2>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>Area</th><th>v26.0</th><th>v29.0</th></tr></thead>
+      <tbody>
+        <tr><td>libdexshell.so (arm64)</td><td>1,225 KB</td><td style="color:var(--yellow)">1,374 KB <strong>(+149 KB)</strong></td></tr>
+        <tr><td>dexshellx.pro config</td><td>2,662 B</td><td style="color:var(--orange)">21,283 B <strong>(8× larger)</strong></td></tr>
+        <tr><td>Config magic</td><td>None visible</td><td><code class="inline">DXHD5</code> at offset 211</td></tr>
+        <tr><td>Visible smali classes</td><td>529</td><td style="color:var(--red)">15 <strong>(−514 moved to encrypted DEX)</strong></td></tr>
+        <tr><td>K class JNI names</td><td>ASCII (s, b, j, p…)</td><td style="color:var(--purple)"><strong>Runic Unicode (ᛴᲆᛶ, ᛴᲆᛷ…)</strong></td></tr>
+        <tr><td>VMP mechanism</td><td>Threaded bytecode interpreter</td><td style="color:var(--green)"><strong>Native AOT compiler</strong></td></tr>
+        <tr><td>VMP dispatcher</td><td>N.invoke(I,[Object)Object</td><td>N.ᛱᛱ᛽(I,[Object)Object (Runic)</td></tr>
+        <tr><td>InstrumentationHijacker</td><td>Absent</td><td style="color:var(--red)"><strong>Present — reflective mInstrumentation swap</strong></td></tr>
+        <tr><td>DexHeaderRestore</td><td>Absent</td><td style="color:var(--orange)"><strong>Present — per-method lazy decryption</strong></td></tr>
+        <tr><td>XOR key (libdexshell)</td><td>106b07245fa133cd</td><td>27d39683cc50fcba</td></tr>
+        <tr><td>Backend CDN IP</td><td>104.21.65.118</td><td>104.21.33.246 + IPv6</td></tr>
+        <tr><td>UpdateActivity class</td><td>dex_RRtjRSvEcq5kAnFNK9g</td><td>dex_baAEHvRjJcRMuRYW9H8</td></tr>
+        <tr><td>AOSP signing keys</td><td>Absent</td><td style="color:var(--red)">platform.pk8, media.pk8, shared.pk8 bundled</td></tr>
+        <tr><td>Plaintext credentials</td><td>N/A</td><td style="color:var(--red)">USER= / PASS= in SharedPreferences</td></tr>
+        <tr><td>delayed_detection</td><td>Absent</td><td style="color:var(--orange)">~4s deferred scan</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div><!-- /container -->
+
+<div class="footer">
+  Research by <a href="https://github.com/BlackOuTv2">@BlackOuTv2</a> · For educational purposes only ·
+  Frida · radare2 · baksmali · Python
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#161b22',
+      primaryColor: '#1c2128',
+      primaryTextColor: '#e6edf3',
+      primaryBorderColor: '#30363d',
+      lineColor: '#8b949e',
+      secondaryColor: '#0d1117',
+      tertiaryColor: '#21262d',
+      edgeLabelBackground: '#161b22',
+      clusterBkg: '#161b22',
+      titleColor: '#e6edf3',
+      fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace',
+      fontSize: '13px',
+    },
+    flowchart: { htmlLabels: true, curve: 'basis' },
+    securityLevel: 'loose',
+  });
+  hljs.highlightAll();
+</script>
+</body>
+</html>
