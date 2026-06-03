@@ -14,6 +14,17 @@ v26 bytecode interpreter → v29 native AOT compiler. All 11 anti-tamper layers 
 
 [📊 **Visual Research (HTML + Flowcharts)**](https://BlackOuTv2.github.io/DexShell-Research) · [🛠️ Tools](#-tools) · [🔓 Bypasses](#-bypass-techniques)
 
+---
+
+### 👤 Researcher
+
+| | |
+|---|---|
+| **Author** | [@BlackOuTv2](https://github.com/BlackOuTv2) |
+| **GitHub** | https://github.com/BlackOuTv2 |
+| **Research type** | Independent Android security research |
+| **Scope** | Static + dynamic analysis, Frida instrumentation, native disassembly |
+
 </div>
 
 ---
